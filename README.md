@@ -1,8 +1,23 @@
 # MGU Unified Manager
 
-A single Tkinter desktop application that coordinates the BMW MGU
-iDrive 7/8 SSH-root and the MGU Store.
+A single Tkinter desktop application that coordinates the original BMW MGU
+iDrive 7/8 SSH-root project and the MGU Store project. The upstream source
+trees are retained under `vendors/` and are invoked through adapters; their
+source files are not merged or rewritten.
 
+## What the GUI provides
+
+- **Dashboard:** Python, Node.js, OpenSSH and vendor-module health checks.
+- **Vehicle & SSH:** ENET discovery, VIN/gateway detection, read-only status,
+  enable/repair, flash + enable, fix-key and disable.
+- **MGU Store:** first installation/repair, deployment status, backups,
+  component rollback, component removal and backup restore.
+- **Settings:** shared root SSH identity selection and repository locations.
+- **Activity log:** live command output and rotating structured log file.
+
+App browsing, installation and application updates remain in the Store UI on
+the head unit. The desktop panel bootstraps the Store and exposes the original
+deployment tool's component-level maintenance operations.
 
 ## Requirements
 
@@ -103,3 +118,8 @@ project.
 - **Missing SSH flash assets:** the source archive may not contain the
   original project's `data/assets` payloads. Obtain them from the upstream
   project's authorized distribution; do not substitute arbitrary binaries.
+
+
+## Production installers
+
+See [PACKAGING.md](PACKAGING.md). Windows x64 Inno Setup and separate macOS Apple Silicon / Intel DMG builds are automated by `.github/workflows/build-installers.yml`. Node.js 22 and both vendor trees are bundled; Windows also includes portable OpenSSH. Installers are currently unsigned pending release signing credentials.

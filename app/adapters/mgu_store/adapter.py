@@ -1,24 +1,25 @@
 import os
 from pathlib import Path
-from app.core.config import STORE_REPO, STORE_INSTALLER, STORE_DEPLOY, find_executable
+from app.core.config import STORE_REPO, STORE_INSTALLER, STORE_DEPLOY, find_executable, bundled_transport
 
 class MGUStoreAdapter:
-    """Runs the unmodified upstream Node.js installer/deploy CLI."""
+    """Runs the upstream Node.js installer/deploy CLI with the bundled Node runtime."""
     def __init__(self, runner, emit):
         self.runner = runner
         self.emit = emit
         self.node = find_executable("node")
 
     def _require_node(self):
+        self.node = find_executable("node")
         if not self.node:
-            raise RuntimeError("Node.js was not found. Install Node.js 18 or newer and reopen the manager.")
+            raise RuntimeError("Bundled Node.js runtime is missing. Reinstall MGU Unified Manager.")
         if not STORE_INSTALLER.is_file():
             raise FileNotFoundError(f"MGU Store installer missing: {STORE_INSTALLER}")
 
     def install_store(self, identity, extra=()):
         self._require_node()
         if not identity or not Path(identity).is_file():
-            raise RuntimeError("A valid root SSH private key is required. Run SSH provisioning first or select a key in Settings.")
+            raise RuntimeError("A valid root SSH private key is required. Provision SSH first or select a key in Settings.")
         args = [self.node, str(STORE_INSTALLER), "first-install",
                 "--identity", str(identity), "--no-restart-prompt", *extra]
         return self.runner.run(args, STORE_REPO, self.emit, timeout=3600)
@@ -35,7 +36,7 @@ class MGUStoreAdapter:
 
     def node_version(self):
         if not self.node:
-            return "Not installed"
+            return "Bundled Node.js missing"
         import subprocess
         try:
             p = subprocess.run([self.node, "--version"], capture_output=True,

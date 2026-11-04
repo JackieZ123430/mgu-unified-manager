@@ -1,1 +1,1 @@
-"""MGU Unified Manager."""
+"""MGU Unified Manager desktop application."""

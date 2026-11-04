@@ -1,0 +1,121 @@
+name: Build desktop installers
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Prepare bundled runtimes
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force build_inputs | Out-Null
+          Copy-Item (Get-Command node).Source build_inputs/node.exe
+          Copy-Item "$env:WINDIR\\System32\\VCRUNTIME140.dll" build_inputs/ -ErrorAction SilentlyContinue
+          Copy-Item "$env:WINDIR\\System32\\VCRUNTIME140_1.dll" build_inputs/ -ErrorAction SilentlyContinue
+          Copy-Item "$env:WINDIR\\System32\\MSVCP140.dll" build_inputs/ -ErrorAction SilentlyContinue
+          ./packaging/prepare-windows.ps1
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r packaging/requirements-build.txt
+      - name: Build bundled ENET transport helper
+        shell: pwsh
+        run: |
+          pyinstaller --onefile --console --name mgu-connect `
+            --paths vendors/mgu-store/deploy/transport `
+            --paths vendors/idrive7-8-ssh-root `
+            --collect-all cryptography --hidden-import hsfz --hidden-import debug_cert `
+            --distpath dist-transport --workpath build-transport `
+            vendors/mgu-store/deploy/transport/mgu_connect.py
+          Copy-Item dist-transport/mgu-connect.exe build_inputs/mgu-connect.exe
+      - name: Build application
+        run: pyinstaller packaging/mgu_unified_manager.spec --clean --noconfirm
+      - name: Install Inno Setup
+        run: choco install innosetup --yes --no-progress
+      - name: Build Windows installer
+        shell: pwsh
+        run: |
+          & "${env:ProgramFiles(x86)}\\Inno Setup 6\\ISCC.exe" packaging/windows/MGU-Unified-Manager.iss
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MGU-Unified-Manager-Windows-x64-Installer
+          path: dist-installer/*.exe
+
+  macos:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x86_64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Tcl/Tk-enabled Python
+        run: |
+          brew install python@3.13 python-tk@3.13
+          echo "$(brew --prefix python@3.13)/bin" >> "$GITHUB_PATH"
+          python3.13 -m tkinter
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Prepare bundled Node runtime
+        run: |
+          mkdir -p build_inputs
+          cp "$(node -p 'process.execPath')" build_inputs/node
+          chmod +x build_inputs/node
+          ./packaging/prepare-macos.sh
+      - name: Install build dependencies
+        run: |
+          python3.13 -m pip install --upgrade pip
+          python3.13 -m pip install -r packaging/requirements-build.txt
+      - name: Build bundled ENET transport helper
+        run: |
+          python3.13 -m PyInstaller --onefile --console --name mgu-connect \
+            --paths vendors/mgu-store/deploy/transport \
+            --paths vendors/idrive7-8-ssh-root \
+            --collect-all cryptography --hidden-import hsfz --hidden-import debug_cert \
+            --distpath dist-transport --workpath build-transport \
+            vendors/mgu-store/deploy/transport/mgu_connect.py
+          cp dist-transport/mgu-connect build_inputs/mgu-connect
+      - name: Build macOS application bundle
+        run: python3.13 -m PyInstaller packaging/mgu_unified_manager.spec --clean --noconfirm
+      - name: Create DMG installer
+        run: ./packaging/macos/create-dmg.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MGU-Unified-Manager-macOS-${{ matrix.arch }}-DMG
+          path: dist-installer/*.dmg
+
+  publish-release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [windows, macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+      - name: Publish installers to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-assets/*
