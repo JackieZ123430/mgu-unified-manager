@@ -1,0 +1,218 @@
+# Deploy tool changelog
+
+## 0.7.15
+
+- After a firmware update, which puts the root file system back and keeps `/var/opt`, an install sets up again what the update took. Each tool install records the firmware it was installed under (`state.json` `tools`) and keeps the tool's units, drop-ins and `component.json` under `/var/opt/mgu-deploy/kept/<id>/<version>/`.
+- Every install, whatever it installs, lays again from that copy each installed tool that lacks a unit, an enablement link or a drop-in, or was installed under another firmware: its units, links, drop-ins and boot-list entries, its activate hook and postInstall, with no download. A tool installed before copies were kept is left for its source to install again, which the output says. A tool that fails to lay again is rolled back and the rest of the install goes on.
+- iDrive 7: at its first start after a firmware update MainApp marks every installed app as needing an update (`"NO_FORCED_UPDATE_NEEDED": false` in its registry entry) and starts none so marked, so our apps' tiles show and a tap does nothing. An install of such an app, already current, installs it afresh (uninstall, install, its data folder carried over to the new install): a new registry entry, set up for the firmware it runs on, built against this firmware's donor apps. Not while no app manager runs; the output says so.
+- `status` and `status --json` say what does not work until then: a tool's `stale` (the pieces it lacks, or the firmware it was installed under) and `kept` (whether an install lays it again itself), an app's `stale` (the app manager waits for its update; iDrive 7 and 8).
+
+## 0.7.14
+
+- iDrive 7: `status` and `check` report the tile of an app listed in `custom_apps.json` (ours and the other apps the provisioning fallback lists) as shown only while the running app manager runs the fallback copy (`fallback.manager_runs_copy` true); otherwise, and with no app manager running, as `hidden`, whatever the app's registry `provisioningCache` holds. `tile_provisioned`, `tile_fallback` and `tile_visible` in `status --json` follow the same rule. Apps not in `custom_apps.json`, units with the retired installer's leftovers, and iDrive 8 are reported from the registry cache.
+
+## 0.7.13
+
+- iDrive 7: an install in which every app is already current, on a unit whose provisioning fallback is not active (its unit missing, or `main.js` not bound to its copy) while our apps are listed in `custom_apps.json`, turns the fallback on again and restarts the app manager once, under the usual restart rules (none when it already runs the fallback copy), so the apps' tiles show. While `vsomeipd.service` or `hmi.service` is not running, the manager is not restarted (a restarted one could not start) and the apps are listed from the next start. A copy that does not build leaves the fallback as it was; the install stands, and `status --json` gives the reason as `fallback.refused`.
+- `status --json` says whether the running app manager runs the fallback copy (`fallback.manager_runs_copy`; `null` without a manager or on iDrive 8).
+- `mgu-install.js first-install` says `Setup is done` only when, besides the services, our apps' tiles show on iDrive 7. Otherwise it ends with `Restart the head unit to finish setup.` and the restart question, or, when the fallback could not be turned on, with one line saying why (followed by the restart line while a service still waits for the next start).
+
+## 0.7.12
+
+- iDrive 7: an install with an app, on a unit where the running app manager can list no app of ours (no provisioning fallback yet, as at a first install), restarts the manager once: app-privacy's restart waits for the app's, so the manager comes back with the patch, the fallback and the app. Until then it runs the stock code it started with, which knows nothing of the app. A restart still owed when the install ends is made then. Elsewhere, and for app-privacy on its own, app-privacy restarts the manager as it applies.
+- `mgu-install.js first-install` ends with `Restart the head unit to finish setup.` when a restart is needed, then at a terminal asks `Restart the head unit now? [y/N]`; `y` restarts the head unit the way the Store's Restart head unit does. Not asked under CI or with `--no-restart-prompt`.
+
+## 0.7.11
+
+- Every service and socket unit a tool installs has its name in recmgr's `[Whitelist]` and `[WhitelistExitSuccess]`, and every ELF file it ships executable has its file name in the crash handler's `[Whitelist]` (the crash handler matches the file name of the crashed process's executable), besides the tool's `recmgr` and `crashNames` names, which go in as they are (a `recmgr` name other than letters, digits and `:._+@-` is refused at install): a crash or exit of a tool's own program does not restart the head unit. A name a tool does not declare is left out when the firmware has it (in `[ForceRestartList]`, a unit in `/lib/systemd/system` or `/usr/lib/systemd/system`, a program in `/bin`, `/sbin`, `/usr/bin` or `/usr/sbin`). An uninstall takes out the names no other installed tool has. `status`, run as root, adds the names missing from either list for the tools already installed, so the updater's status check after this update brings them; they count from the next start of the head unit. One list `status` cannot edit leaves the other's names added.
+- recmgr's restart list and the crash handler's are read as the firmware reads them (`#` starts a comment anywhere on a line, entries trimmed) and keep their line ending. A list with none of the sections an edit touches (recmgr's `[Whitelist]` and `[WhitelistExitSuccess]`, the crash handler's `[Whitelist]`), such as an empty or torn file, is not edited; an edit that would change anything but the tools' names is refused too. The install is refused (exit 2) and the file left as it is, saying which file and why: `/etc/recmgr-restartlist.conf has no [Whitelist] or [WhitelistExitSuccess] section; left as it is`. An edit that changes nothing goes through whatever the list holds.
+- Every file the tool writes on `/` is on disk before it replaces the old one, and the replacement is on disk before the next change, so a power cut leaves the old or the new file. An install has its payload under `/var/opt` and its list entries on disk before it writes its units, enablement links and drop-ins; an uninstall takes the units out before the entries; a rollback or restore adds the snapshot's entries first, puts the units, links and drop-ins back, and writes the snapshot's lists last. No power cut leaves a unit enabled without its entries.
+
+## 0.7.10
+
+- Every service unit an installed tool lists, whatever repository it comes from, gets the drop-in `<unit>.d/zz-mgu-deploy-limits.conf`: `LimitCORE=1`, at which the kernel pipes no core dump to the crash handler, so a crash of the service or of a program it starts never restarts the head unit; and a start limit of 20 starts within 10 minutes (`StartLimitIntervalSec=600`, `StartLimitBurst=20`, over a unit's own `StartLimitIntervalSec=0`), so a service that keeps failing is left failed instead of restarting for ever. Installs write it, uninstalls remove it, snapshots, rollbacks and restores carry it, and `status` gives it to the tools installed before this version and takes it from units no tool lists (`status --json` `service_limits`). Stock units are never given one. A running service takes the limits at its next start.
+- An install or rollback starts a service its start limit stopped again (`reset-failed` first); for a socket-activated service, its socket.
+
+## 0.7.9
+
+- The refusal of an app install when the head unit's coding is missing (not valid, or the default values) and no app manager runs comes once the artifacts are read and checked: before app-privacy's check and any change to the unit. It applies on iDrive 8 as well, where oapcontroller starts no MainApp-21 on such a coding either. The message says the coding is missing, that this often happens after enabling SSH or flashing, and to restore it from a backup (BimmerCode, E-Sys or ISTA) or have HU_MGU coded, restart the head unit and install again.
+- `mgu-install.js first-install` reads the same before it downloads or sends anything, and stops there (exit 2) with that message.
+
+## 0.7.8
+
+- iDrive 7: when the head unit's coding is not valid or is the default values (for the default values, oapcontroller's journal says only `Coding base: Default values flag is set, default values will be used`), oapcontroller never starts MainApp. With no app manager running then, an install with an app in it is refused before anything changes, saying so: the head unit needs coding to the car, a restart, then the install again.
+
+## 0.7.7
+
+- `main.js` (`main.bundle.js` on MainApp 6.5.5) is bound only to the fallback copy as it is. A failed first app install, a restore or a rollback that removes or replaces the copy unmounts the bind left on the old file, and binds the copy there again while the fallback's unit is present; with no copy, `main.js` stays the stock file. `restore` and app-privacy's revert first unmount such a bind, so `restore stock` succeeds in one run from it, and never bind a copy that is not there.
+- A failed first install of an app that leaves it no registry entry takes out the app's `uids.txt` lines, the one the app manager gave it before it stopped and any an earlier failed attempt left, written in place: the file keeps its owner, mode and ACLs.
+
+## 0.7.6
+
+- iDrive 7 with MainApp 6.5.5: app installs and updates work. Its `main.js` and `AppManagement.js` are bytecode-loader stubs, so the provisioning fallback copy is built from `main.bundle.js` and bound over it, and the tool reads `AppManagement.bundle.js`. Its manager has no `AppManagementController`, so the in-place hook works with its `AppManagerStub` directly; a fresh app the restarted manager has not installed by itself once started up is installed in place.
+
+## 0.7.5
+
+- iDrive 7: an app's SOME/IP manifest may name interfaces the head unit's firmware does not have (iDrive 8's, on older iDrive 7 firmware); MainApp refuses such an app (`IFConfigGenerator::generate() Interface … not found`). The app is installed with those interfaces taken out of its manifest, read against the firmware's interface database (`/etc/oap/someip/someip-interfaces.json`), and the output names them: `…, de.bmw.infotainment.hmi.entrypoint2.EntryPoint2 (not on this unit) taken out of manifest.json`. The certification service stays. iDrive 8 installs the manifest as it is.
+
+## 0.7.1
+
+- When app-privacy (1.7.0 on) leaves out privacy-only edits this MainApp has no place for, the output says which, once per run: `app-privacy: 11 of 12 privacy edits applied; skipped: update-availability sweep`. `status` shows the same for app-privacy's last run.
+- `status --json` carries app-privacy's record of its runs (`app_privacy_record`, null without one).
+
+## 0.7.0
+
+- A tool's `activate` and `deactivate` (`component.json`; `deploy/hu artifact` keeps them): commands run as root, without a shell, in the version's folder, for at most 120 s (`MGU_DEPLOY_HOOK_TIMEOUT_MS`). `activate` runs on every install, update and rollback once the version is in place and `/` is read-only again, before `postInstall` and `check`; a failure is rolled back: an update returns to the previous version, a first install is removed. An install that ran `activate` and is rolled back (a failed `activate` or `check`) runs the previous version's `activate` again. `deactivate` runs before a removal changes anything; a failure keeps the tool, and a removal that fails after it runs the tool's `activate` again. A `{"reboot": "<why>"}` last line marks the tool restart-pending (a removal's, the deploy tool).
+- A hook's `"removeWhenUnused": [<path>...]`: files on `/` a process may still run (a binary a hook replaced while it ran). One no process runs is removed at once; one still run waits in `remove-when-unused.json` (`status --json` `remove_when_unused`) and `mgu-deploy-cleanup.service` (enabled for `late.target` and in recmgr's list from the first one) removes it at a later start, once nothing runs it. `remove-unused` runs that removal. Snapshots hold the unit, its link and the list.
+
+## 0.6.10
+
+- iDrive 8: an app update applied at the start of the head unit that MainApp-21 does not install (`UPDATE_FAILED`, for example a manifest naming an interface the head unit does not have) leaves the previous version installed. The update keeps that version (registry entry, home with its data, personal copies and vsomeip policy with their owners and modes, the ACLs of those under `/var/opt`, uid and package) until MainApp-21 has installed the new one; at the next start, before MainApp-21, a version it did not install is put back as it was, and MainApp-21 loads it at that start with its uid, data and tile. MainApp-21 is never restarted for it. `last_apply` reports it (`action` `restore`).
+
+## 0.6.9
+
+- A tool's `check` (`component.json`: one of its files, then its arguments) runs once its new version runs, after the health check and `postInstall`: node for a `.js` file, else sh, from `current/`, for at most 5 minutes (`MGU_DEPLOY_CHECK_MS`). A failing check rolls the install back like a failed health check, its running services restarted on the previous version.
+- A new tool version that runs only from the next start of the head unit (a renderer that keeps running, a recmgr entry not loaded yet) is checked at that start: `mgu-deploy-verify.service` (enabled for `late.target`, in recmgr's list, run while `verify.json` exists) runs `verify` once the head unit has been up 150 s (`MGU_DEPLOY_VERIFY_AFTER_S`): the tool's services that start at boot must run and stay up, and its `check` must pass. One that fails goes back to the version before, its running services restarted. Each tool is checked once; the start never restarts the head unit. `status --json` reports the outcome as `last_verify`.
+- `rollback <app>` (iDrive 7): uninstall, then install the newest kept older package, with the app's data folder carried over. When that install fails, the version that was there is installed again. Every app install keeps its package, and the one of the version it replaces, in `/var/opt/mgu-deploy/kept/<id>/`; an uninstall removes them.
+- `status --json` gives each tool and app `previous`: the older version its rollback returns to, or null.
+
+## 0.6.8
+
+- An app update the app manager rejects (`UPDATE_FAILED`, for example a manifest naming an interface the head unit does not have) leaves the previous version installed, registered and with its tile. The manager unregisters the app and removes its source, SOME/IP interfaces and HMI data before it rejects the new version; the rollback puts these back with their owners, modes and ACLs. On iDrive 7 the app manager then restarts once and shows the tile at once. On iDrive 8 the app is back from the next start of the head unit, with its uid and data.
+
+## 0.6.7
+
+- iDrive 7: an app install that finds no app manager running (no MainApp node child within 30 s) fails once those 30 s pass and is rolled back, with no 600 s wait for an install nothing makes. The output says to restart the head unit and run the install again, and shows what tells why: MainApp's folder and version, oapcontroller's state and drop-ins, the head unit's uptime, the mounts over `main.js`, the processes running as MainApp's uid, the node, MainApp and oapcontroller processes, and oapcontroller's last lines about MainApp.
+
+## 0.6.5
+
+- A tool whose `current` is a folder, not a link (app-privacy 1.5.0 as an earlier installer left it), installs: the folder goes aside as `current.legacy-<pid>` and is removed once the new version is up. A failed install puts the folder back as `current`, with no `current.new` left; after a failed health check or app-privacy apply the tool's services restart on it and its app-privacy applies again, as with a previous version. The folder of an install that was killed comes back as `current` at the next changing run of the deploy tool, unless a new `current` is in place; then it is removed.
+- An app update lists the app enabled and allowed in `custom_apps.json` even when its registry entry caches `-enabled` and `-allowed` false (an app provisioning once dropped), so the app manager installs it.
+
+## 0.6.4
+
+- iDrive 7: our apps go first in MainApp's install queue. The fallback copy of `main.js` runs an install or update of an app `custom_apps.json` lists right behind the one running, ahead of BMW's online apps that MainApp retries at every start without ConnectedDrive, and without the doubling retry wait they leave. The app manager runs it from its next start; a `main.js` without its anchors gets a copy without it.
+
+## 0.6.3
+
+- iDrive 7 with MainApp 8.1.1: app installs and updates work. MainApp 8.1.1 records no install source for an app, so an install counts as done once the app's registry entry, its files at the new version and its keychain are there. It does not update apps when it starts, so an update that cannot be made in place restarts the app manager once and then has it update the app in place.
+- The keychain wait (`CertificateManager.js` copy) works with MainApp 8.1.1's script too.
+
+## 0.6.2
+
+- iDrive 8: app installs, updates and uninstalls happen live, with no head-unit restart. MainApp-21 installs, updates or removes the one app itself, and its tile appears or goes at once. It turns itself on after the update: from the next start of the head unit every change is live, and until then changes are applied at the next start, as before.
+- iDrive 8: a change that MainApp-21 does not take live is applied at the next start, as before. MainApp-21 is never restarted by the deploy tool, `restore` and `fallback on|off` included.
+- iDrive 8: the boot unit leaves MainApp-21's own `main.js` in effect when its copy does not match this firmware or does not parse. If MainApp-21 restarts within a minute of starting, or during a live change, live changes stay off until the next start of the head unit.
+- `fallback on` and `fallback off` work on iDrive 8; `fallback migrate` stays iDrive 7 only.
+
+## 0.6.1
+
+- `"postInstall": [<script>, <arg>...]` in a tool's `component.json` (`deploy/hu artifact` keeps it): the script, one of the tool's files, runs with `sh` as root from `current/` after every install of the tool (the same version again too), for at most 5 minutes; its output is shown, and the install stands whatever it does (a failure is a warning). mgu-render 0.4.1 makes its HMI page template with it.
+
+## 0.6.0
+
+- A crash of one of our programs does not reboot the head unit: the crash handler's restart whitelist (`/etc/crashhandler-restartlist.conf`, `[Whitelist]`) gets the names of the installed tools' programs, from their `component.json` `crashNames`, or this tool's own list for a tool that has none (`mgu-uplink`, `mgu-render`, `python3`). Each tool install and uninstall updates it in the same snapshot, adding after the last entry and removing only names this tool added; other lines and sections stay as they are. `status`, run as root, brings the list up to date too, so it is written right after a deploy tool update and again after a firmware update; it remounts `/` only for a change, never while `/` is read-write or app-privacy's boot run has not finished, and reports the result as `crash_list` in `status --json`. The crash handler reads the list at boot. A head unit without the file is left alone.
+
+## 0.5.10
+
+- An install that brings app-privacy first checks that its patch fits this head unit's MainApp. When its edits do not fit (a MainApp version it does not support), the whole install is refused before anything changes on the car, naming the MainApp version and the edits that do not fit. An app-privacy apply that refuses names them too.
+- The fallback copy of MainApp's `main.js` is bound only when it parses (`node --check`): an install or `fallback on` with a copy that does not parse is refused, naming the syntax error, and MainApp keeps its own `main.js`. The boot unit, refreshed by the next app install or `fallback on`, leaves such a copy unbound at boot.
+
+## 0.5.9
+
+- Source packages (`mgu-app.json`) are built with the certification service in their SOME/IP manifest, so one whose manifest lacks it installs on iDrive 7 and iDrive 8.
+- iDrive 8 packages get the certification service in their SOME/IP manifest when they lack it, as on iDrive 7: MainApp-21 has cadaemon create the app's keychain as the app's uid in the same way.
+- What an interrupted app install left is removed only when this tool provably put it there: the newest snapshot holding the app is this tool's install of it, which found the app absent; the package on disk is the one that install placed, with the checksum recorded for it (`placed` in `state.json`) when there is one. Another installer's app of the same id, placed after our uninstall, stays. A registry entry that cannot be read counts as installed. The listing and the package are snapshotted (`cleanup`) before they are removed.
+
+## 0.5.8
+
+- Apps whose SOME/IP manifest does not name the certification service (`de.bmw.infotainment.certification.Certification`), which includes every idrive7-apps app, install: the deploy tool adds that entry when it prepares the package. Without it, the car does not let the new app's uid reach the service that creates its keychain: MainApp's install waited for a keychain that never came and failed. The emulator does not check those permissions.
+- What an interrupted app install left (the app listed for MainApp and its package in `preinstalled_apps`, which MainApp tries to install at every start) is removed before the next app install, when this tool put it there: its record of the install names a run that is gone, or its install snapshot shows the app was not listed and the package absent before. Anything else stays, said in the output.
+
+## 0.5.7
+
+- Putting the copy of `CertificateManager.js` in place never fails an install: on any error the stock script stays, with a warning.
+- An install MainApp failed as already installed is waited for as before, and needs no bounce once the app is there.
+- Only MainApp's own rejection of an install or update ends it at once; a failure of its AppManagement child or channel goes through the bounce, which restarts the child.
+- The copy's keychain wait is 115 s, inside the 125 s MainApp gives it with app-privacy 1.5.0.
+
+## 0.5.6
+
+- An app install or update that MainApp itself fails (for example, when the head unit's certificate service does not create the app's keychain) fails at once with MainApp's reason, in one line. MainApp is not restarted and no 10-minute wait follows: a restarted MainApp runs the same install, and restarting it stops every app, the Store included.
+- MainApp's installs wait up to 120 s for an app's keychain, and when it is not created, the error names the certificate service's states, the app's security folder before the request and the uid. The deploy tool binds its copy of `CertificateManager.js` over MainApp's at each app install; app-privacy 1.5.0 lets it run that long for our apps (without it, MainApp stops it after 35 s, as before).
+- The waits for MainApp's installs are measured in wall-clock time.
+
+## 0.5.5
+
+- iDrive 8: app-privacy installs, updates, rolls back and uninstalls without restarting MainApp-21; its patch takes effect at the next start of the head unit, and app-privacy shows as pending until then. With app-privacy installed, an app is queued only after its patch applies.
+
+## 0.5.4
+
+- An app update, the Store's included, runs in place, restarting only that app, also right after an update of the deploy tool: while the app manager runs a provisioning fallback with the same in-place install hook, it keeps that one, and the deploy tool's new one takes effect at the next start. An app manager restarted moments before (by an app-privacy update, say) is given its usual time to come up first.
+- An update the running app manager cannot make in place restarts the app manager before the new version is put in place, then has it update the app in place, so the app's tile stays on the HMI. An app manager that started less than a minute before, whatever restarted it, is given that minute before the new version is put in place, saying so. (An update the app manager made while it was starting could leave the app without its tile until the head unit restarted.)
+
+## 0.5.3
+
+- A tool's `"internet": true` can name in `"uids"` a file under `/var/opt/<id>/` the tool keeps its uids in (the updater picks its own on the unit); its `uids.d/<id>` follows that file.
+
+## 0.5.1
+
+- iDrive 8: apps get their tile there. Each app is given what MainApp-21 needs to install and show it: the permission tables it requires, and an appletId chosen on the car from the ids its apps and the HMI already use. An update keeps the app's id; a package's own id is kept when it is free; otherwise a free one is given and the output says so. If the ids in use cannot be read, the install stops rather than guess.
+- `appmanager adopt` prepares IterioDev's queued installs the same way. One whose package is unusable is dropped, saying why; if the car itself fails (no space, a read error), the adopt is undone and his queue kept.
+
+## 0.5.0
+
+- IterioDev's App Manager is replaced by the Store. `appmanager adopt` takes over a unit that runs it: its daemon disabled and stopped (a start the boot queued cancelled; one recmgr does not list runs until the next boot, which completes the adoption), its queued app changes moved to ours (iDrive 8) and its boot hook disabled, its iPhone tether stopped and disabled, its renderer made the tool `mgu-renderd` from the program it runs (left running), and the apps it installed or had queued and its repositories (without tokens) recorded in `appmanager.json`; with our `mgu-renderd` installed first, our unit goes back over the one it wrote; nothing is reinstalled. `uninstall oap-appmanager` adopts first, removes its units and boot hook, keeps `/var/opt/appmanager` as `appmanager-removed/`, and uninstalls its app (on iDrive 8 at the next start); the apps and the renderer stay. Both run in one snapshot, rolled back on a failure. `status --json` has `appmanager`.
+- Its app package (`oap-appmanager`) and tether packages (`mguService` `tether`) are refused: mgu-uplink drives the iPhone.
+- The provisioning fallback gives an app whose `custom_apps.json` entry leaves out `-enabled` or `-allowed` the value `"true"`, so apps idrive7-apps' own installer listed there keep their tiles once the fallback takes over its main.js hook.
+- A tool takes over what idrive7-apps' own installer (`# added by mgu-app-install.sh`) left: a unit or drop-in of the same name is written over, its controller gate files go with them, and a tool serving `/run/mgu-renderd` removes their renderer's unit, link and program (the running one stops at the next boot). All in the install's snapshot.
+- An update of an app installed without a CertificateManager keychain (idrive7-apps' installer installs them so) is done once the manager has the new version in place: MainApp's update keeps what the app had, without a keychain.
+- `status --json` `idrive7.apps`: the apps idrive7-apps' installer put on the unit (registered, listed in `custom_apps.json`, with its kit's `app-spec.json`, not installed by this tool), for the updater to give them their origin.
+
+## 0.4.0
+
+- Providers of one capability install side by side, a second renderer among them; `install --replace` is gone (the flag is ignored). A service package or provider whose unit another manager installed is still refused.
+- `"keepRunning": true` in a tool's `component.json` (`deploy/hu artifact` keeps it): a running unit in `restart` is not restarted by an update or a rollback (to a version with or without it); it keeps the version it started with, reported pending (`the new version runs from its next start`). Renderer service packages get it, as IterioDev's App Manager 2.0.1 leaves a running renderer running.
+- A running socket whose unit changed is restarted when its service is stopped, so it listens as the new unit says; while its service runs it changes with the next boot (pending).
+
+## 0.3.2
+
+- A tool's `dropins` (`[{unit, name}]`, payload `dropins/<unit>.d/<name>`; `deploy/hu artifact` packs them from `from`): drop-ins for units the tool does not own, installed with its units, in the snapshot, removed on uninstall with the folder the tool made; one no tool of ours installed refuses the install.
+- `deploy/hu install --with-uplink` adds `mgu-uplink` alone, not the other optional tools.
+- `sdk-donor` also writes the oap-sdk module that module mode generates from the donor, `<run>/sdk-donor/oap-sdk/index.js` and `package.json`, and `--json` names its folder as `module`. The updater puts it where a repository's build asks for it (`build.sdk`).
+
+## 0.3.1
+
+- `mgu-install.js first-install` puts on the renderer (`mgu-render`) and the internet uplink (`mgu-uplink`) too; `--no-renderer` and `--no-uplink` leave them out; one the catalog does not list, or the deploy tool refuses (another renderer is installed), is left out, saying so, and the rest installs.
+
+## 0.3.0
+
+- The head unit: iDrive 7 or iDrive 8 by MainApp's folder (`oap-mainapp` / `oap-mainapp21`), else by the running HMI (`HmiMain3D` / `Hmi8`); the firmware from `/etc/os-release-id-dlt` (else `os-release`). `status` and `check` print them; `status --json` has `unit: {hmi, firmware}`.
+- `mguHmi` (`["ID7"]`, `["ID8"]`, both) in an app's `package.json` or `mgu-app.json` or a tool's `component.json`; an app without it is for the HMIs its rhmiData has a UI for. An install not for this unit is refused (exit 2) with the reason.
+- iDrive 8 apps: an install or uninstall is queued and applied at the next start by `mgu-deploy-apply.service` (`apply-pending`, before oapcontroller, refused while MainApp runs), as IterioDev's App Manager does: the package in MainApp-21's `preinstalled_apps` (npm format), the app's lines in the six das files, an update uninstalling the installed version first, a removal moving the app's files to `id8/trash/`. No app-privacy or provisioning fallback there. Donors are searched in MainApp-21's folder there, without the apps provisioning lists as preinstalled custom apps.
+- Service packages (`mguService` `renderer`, `tether`) install as tools: the program in `versions/<version>/`, the App Manager's unit (root), recmgr entries; the renderer enabled, the tether on demand. Each provides its kind.
+- Capabilities: a tool's `mguProvides`. A second provider is refused; `install --replace` uninstalls the installed one first, in one transaction, and puts it back when the new one fails. A service package or provider whose unit another manager installed is refused. `status --json` gives each tool's `provides`.
+- With `--skip-older` an artifact not for this unit is skipped, saying why; the others install.
+- A unit without recmgr's list: nothing is written there and units start at once.
+- `deploy/hu artifact` keeps `mguHmi` and `mguProvides`; `mgu-install.js usb-repo` lists a renderer or tether package as a tool providing its kind, requiring `mgu-deploy` 0.3.0, and refuses a malformed `mguHmi` or `mguProvides`.
+
+## 0.2.4
+
+- A source package whose tree ships no file at its `package.json` `main` (`javascript/<file>.js`) gets the entry point of the SDK donor's own package (the file that package's `main` names), with a `runnerConfig.json` beside it naming the app's bundle and data folder; with no donor entry point, a loader that runs `javascript/app.js`. `build.json` and the build line name where the entry point came from.
+- The provisioning fallback finds its insertion points in the app manager's `main.js` by shorter anchors; the copy it builds is unchanged.
+
+## 0.2.3
+
+- `updater-token` stores a token of the updater's own, not a source's: its text in `credentials/token-<id>` and its entry in `credentials/tokens.json`, unless one with that text is stored already. `--list [--json]` names the stored tokens (id, label, account), `--remove <id>` removes one; `--source` is gone. `deploy/hu install`/`updater-token` and `mgu-install.js token` (`--list [--json]`, `--remove <id>`) use it this way. `status` reports `updater_tokens`, how many are stored.
+
+## 0.2.2
+
+- `uninstall <id>` of an app has the running app manager uninstall it in place through the fallback copy's hook: the manager stops the app, unregisters it, which takes its tile off the HMI at once, and removes its folders, with no bounce. When the manager has no hook, does not take the request, refuses or fails it, does not finish in time or restarts, the uninstall removes the app and bounces the manager as without the hook. An app whose home's `package.json` does not name it is not handed to the manager (its home stays) and goes through the bounce.
+- `install.sh` ends, while the updater (or, with `--with-uplink`, the uplink) is not running, with one line saying a head-unit restart finishes setup.
+
+## 0.2.1
+
+- SDK donors are stock BMW packages only; local markers and both manager lists exclude custom installs. Root splits donor bundles as an unprivileged uid/gid with a timeout and output cap, linking only returned module source strings.
+- Install kits keep newer installed tools and apps while still seeding updater sources and tokens. A kit includes a token only with an explicit `--updater-token-file`.
+- A package built elsewhere installs through MainApp with neither `node_modules/` nor `npm-shrinkwrap.json` (an empty shrinkwrap is added) and with a `permissions.json` lacking one of the two ACL tables (added empty). An artifact's `./` root entry is accepted.
+- Snapshots exclude updater sources and credentials, which survive restores of both current and older manifests, including restores that remove the updater.

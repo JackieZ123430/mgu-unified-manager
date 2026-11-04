@@ -1,0 +1,11 @@
+# Current GUI settings are intentionally minimal and portable.
+# SSH identity can be selected from the Settings tab.
+vehicle:
+  arch: ID7
+  gateway: auto
+  mgu_ip: ""
+store:
+  node_minimum_major: 18
+  restart_prompt: false
+logging:
+  level: INFO

@@ -1,0 +1,12 @@
+[project]
+name = "mgu-unified-manager"
+version = "0.1.0"
+description = "Unified desktop GUI for BMW MGU SSH provisioning and MGU Store deployment"
+requires-python = ">=3.9"
+dependencies = ["cryptography>=41.0"]
+
+[project.scripts]
+mgu-manager = "app.main:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
