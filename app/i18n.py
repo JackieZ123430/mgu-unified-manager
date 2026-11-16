@@ -1,0 +1,108 @@
+"""Display-only Simplified Chinese localization; original English is the fallback.
+Translation by: 小白151 / 小白科技杂物社 / JackieZ123430.
+Localization provenance: XIAOBAI-ZHCN-20261116. No telemetry or runtime watermark.
+"""
+import locale
+import os
+
+ZH_CN = {
+    "Ready": "就绪",
+    "Dashboard": "总览",
+    "Vehicle & SSH": "车辆与 SSH",
+    "Settings": "设置",
+    "Activity log": "操作日志",
+    "Clear log": "清空日志",
+    "System overview": "系统概况",
+    "One desktop interface for SSH provisioning and MGU application deployment.": "在同一桌面界面中配置 SSH 和部署 MGU 应用。",
+    "Python runtime": "Python 运行环境",
+    "Node.js runtime": "Node.js 运行环境",
+    "OpenSSH client": "OpenSSH 客户端",
+    "SSH Root module": "SSH Root 模块",
+    "MGU Store module": "MGU Store 模块",
+    "Checking…": "正在检查…",
+    "Quick actions": "快捷操作",
+    "Discover vehicle": "发现车辆",
+    "Check SSH status": "检查 SSH 状态",
+    "Install MGU Store": "安装 MGU Store",
+    "Refresh health": "刷新环境检查",
+    "Safety": "安全提示",
+    "Original repositories are retained under vendors/ and invoked through adapters.": "原项目保留在 vendors/ 中，通过适配器调用。",
+    "Flashing can erase head-unit coding / CAFD definitions and BMW Digital Key pairings. The manager never flashes automatically. Back up coding and confirm stable vehicle power before any flash operation.": "刷写可能清除主机编码／CAFD 定义和 BMW 数字钥匙配对。本工具不会自动刷写。刷写前请备份编码，并确保车辆供电稳定。",
+    "Detect VIN / gateway": "检测 VIN／网关",
+    "Variant": "主机类型",
+    "Gateway": "网关",
+    "Vehicle discovery & root SSH": "车辆发现与 root SSH",
+    "Uses the original idrive7-8-ssh-root implementation without editing its source.": "调用原版 idrive7-8-ssh-root，不改动其源代码。",
+    "SSH operations": "SSH 操作",
+    "Read status (read-only)": "读取状态（只读）",
+    "Enable / repair (no flash)": "启用／修复（不刷写）",
+    "Flash + enable": "刷写并启用",
+    "Fix refusing SSH key": "修复被拒绝的 SSH 密钥",
+    "Disable SSH": "关闭 SSH",
+    "Open vendor README": "打开原项目说明",
+    "Persist SSH and turn debug mode off (recommended)": "持久启用 SSH 并关闭调试模式（推荐）",
+    "Generate unique per-vehicle SSH key (advanced; not recommended)": "生成车辆专用 SSH 密钥（高级；不推荐）",
+    "A flash is a destructive programming operation. The flash and fix-key actions require explicit confirmation.": "刷写属于破坏性编程操作。刷写和密钥修复操作均需明确确认。",
+    "MGU Store & application deployment": "MGU Store 与应用部署",
+    "Uses the original Node.js installer and deployment CLI. Node.js 18+ and root SSH access are required.": "使用原版 Node.js 安装器和部署命令行工具。需要 Node.js 18 或更新版本，以及 root SSH 访问权限。",
+    "SSH identity shared with Vehicle & SSH:": "与“车辆与 SSH”共用的 SSH 私钥：",
+    "Browse…": "浏览…",
+    "Store bootstrap": "商店初始化",
+    "Install / repair MGU Store": "安装／修复 MGU Store",
+    "Component maintenance": "组件维护",
+    "Component ID": "组件 ID",
+    "Check installed components": "检查已安装组件",
+    "List backups": "列出备份",
+    "Rollback component": "回退组件",
+    "Uninstall component": "卸载组件",
+    "Backup name (default: stock)": "备份名称（默认：stock）",
+    "Restore backup": "恢复备份",
+    "App browsing, app installation and app updates are provided by the MGU Store UI on the head unit. This desktop panel bootstraps the Store and exposes the upstream deploy tool's component maintenance commands.": "应用浏览、安装和更新在车机的 MGU Store 中完成。本桌面工具用于初始化商店，并提供原版部署工具的组件维护操作。",
+    "Unified settings": "统一设置",
+    "The original repositories remain under vendors/. Settings here select the shared SSH key and show dependency state.": "原项目保留在 vendors/ 下。此处可选择共用的 SSH 私钥并查看依赖状态。",
+    "Root SSH private key": "root SSH 私钥",
+    "Auto-detect key for VIN": "按 VIN 自动查找密钥",
+    "Refresh dependency checks": "刷新依赖检查",
+    "Vehicle discovery": "车辆发现",
+    "No ENET gateway responded. Check cable, adapter and vehicle wake state.": "未收到 ENET 网关响应。请检查线缆、网卡以及车辆是否唤醒。",
+    "No saved SSH identity found yet. Provision SSH first, then select the generated key.": "尚未找到已保存的 SSH 私钥。请先配置 SSH，再选择生成的密钥。",
+    "Select root SSH private key": "选择 root SSH 私钥",
+    "SSH private keys": "SSH 私钥",
+    "All files": "所有文件",
+    "Disable root SSH": "关闭 root SSH",
+    "Revert persistence and stop SSH on the head unit?": "撤销持久启用设置并停止主机上的 SSH？",
+    "VIN required": "需要 VIN",
+    "Enter a VIN or detect it before flashing.": "刷写前请输入或检测 VIN。",
+    "Destructive operation": "破坏性操作",
+    "Destructive repair": "破坏性修复",
+    "Enter a VIN or detect it before Fix-key.": "修复密钥前请输入或检测 VIN。",
+    "Fix-key re-flashes the head unit. Coding and Digital Key warnings apply. Continue?": "修复密钥会重新刷写主机，同样可能影响编码和数字钥匙。是否继续？",
+    "Component ID required": "需要组件 ID",
+    "Enter a component ID.": "请输入组件 ID。",
+    "Rollback": "回退",
+    "Available": "可用",
+    "Missing": "缺失",
+    "not reported": "未报告",
+    "FLASH WARNING\n\nFlashing can erase HU coding / CAFD definitions and BMW Digital Key pairings. It can also brick the head unit. Back up coding first and ensure stable vehicle power.\n\nThis operation is never performed automatically.\n\nContinue with Flash + Enable?": "刷写警告\n\n刷写可能清除主机编码／CAFD 定义和 BMW 数字钥匙配对，也可能使主机无法使用。请先备份编码，并确保车辆供电稳定。\n\n本工具不会自动执行此操作。\n\n是否继续刷写并启用？",
+    "Rollback component '{cid}' to its previous version?": "是否将组件“{cid}”回退到上一版本？",
+    "Uninstall '{cid}' from the head unit?": "是否从主机卸载“{cid}”？",
+    "Restore head-unit backup '{name}'? This changes installed components.": "是否恢复主机备份“{name}”？此操作会更改已安装组件。",
+    "Running: {v0}": "正在运行：{v0}",
+    "{v0}: failed ({v1})": "{v0}：失败（{v1}）",
+    "Discovered gateway {v0}; VIN: {v1}": "已发现网关 {v0}；VIN：{v1}",
+    "[{v0} completed; exit code {v1}]": "[{v0} 已完成；退出码 {v1}]",
+    "SSH repository: {v0}": "SSH 项目路径：{v0}",
+    "MGU Store repository: {v0}": "MGU Store 项目路径：{v0}",
+    "ERROR: {v0}": "错误：{v0}",
+    "MGU deploy: {v0}": "MGU 部署：{v0}"
+}
+
+def language():
+    requested = os.environ.get("MGU_UI_LANGUAGE")
+    if not requested:
+        requested = locale.getlocale()[0] or "en"
+    tag = requested.lower().replace("_", "-")
+    return "zh-CN" if tag in ("zh", "zh-cn", "zh-hans", "chinese (simplified)", "chinese (simplified)-china", "chinese (simplified)-people's republic of china") else "en"
+
+def tr(text):
+    return ZH_CN.get(text, text) if language() == "zh-CN" else text

@@ -1,5 +1,7 @@
 # MGU Unified Manager
 
+[简体中文说明](README.zh-CN.md)
+
 A single Tkinter desktop application that coordinates the original BMW MGU
 iDrive 7/8 SSH-root project and the MGU Store project. The upstream source
 trees are retained under `vendors/` and are invoked through adapters; their
